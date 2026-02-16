@@ -105,7 +105,8 @@ def predict(data: PredictRequest):
     else:
         risk = "Low"
 
-    explanation = explain_prediction(features)
+    explanation = explain_prediction(features, model)
+
 
     # Save to Supabase
     supabase.table("user_assessments").insert({
