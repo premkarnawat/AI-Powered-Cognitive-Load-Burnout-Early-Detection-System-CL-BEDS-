@@ -108,18 +108,17 @@ def predict(data: PredictRequest):
     explanation = explain_prediction(features, model)
 
     # Save to Supabase
-    supabase.table("user_predictions").insert({
-        "user_id": data.user_id,
-        "fatigue": data.fatigue,
-        "work_hours": data.work_hours,
-        "sleep": data.sleep,
-        "screen_time": data.screen_time,
-        "study_hours": data.study_hours,
-        "social_media_hours": data.social_media_hours,
-        "stress": data.stress,
-        "burnout_probability": float(probability),
-        "risk_level": risk
+    supabase.table("user_assessments").insert({
+    "user_id": data.get("user_id", "anonymous"),
+    "sleep": data["sleep"],
+    "work_hours": data["work_hours"],
+    "study_hours": data["study_hours"],
+    "screen_time": data["screen_time"],
+    "stress": data["stress"],
+    "fatigue": data["fatigue"],
+    "prediction": float(probability)
     }).execute()
+
 
     return {
         "burnout_probability": float(probability),
