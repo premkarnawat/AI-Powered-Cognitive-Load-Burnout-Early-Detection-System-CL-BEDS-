@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import numpy as np
 import joblib
 import os
 from supabase import create_client
@@ -8,9 +7,9 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from explainability.explain import explain_prediction
 
-# ----------------------------------
-# Load Environment Variables
-# ----------------------------------
+# ============================================================
+# LOAD ENV VARIABLES
+# ============================================================
 
 load_dotenv()
 
@@ -24,9 +23,9 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 if not OPENROUTER_API_KEY:
     raise Exception("OpenRouter API key missing")
 
-# ----------------------------------
-# Clients
-# ----------------------------------
+# ============================================================
+# CLIENTS
+# ============================================================
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -35,24 +34,23 @@ llm_client = OpenAI(
     api_key=OPENROUTER_API_KEY
 )
 
-# ----------------------------------
-# Load ML Model Safely
-# ----------------------------------
+# ============================================================
+# LOAD ML MODEL
+# ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(BASE_DIR, "..", "model", "burnout_model.pkl")
-
 model = joblib.load(model_path)
 
-# ----------------------------------
-# FastAPI App
-# ----------------------------------
+# ============================================================
+# FASTAPI APP
+# ============================================================
 
 app = FastAPI(title="AI Powered Burnout Detection System")
 
-# ----------------------------------
-# Request Models (Prevents 422 Error)
-# ----------------------------------
+# ============================================================
+# REQUEST SCHEMAS
+# ============================================================
 
 class PredictRequest(BaseModel):
     user_id: str
@@ -64,24 +62,26 @@ class PredictRequest(BaseModel):
     social_media_hours: int
     stress: int
 
+
 class ChatRequest(BaseModel):
     message: str
+
 
 class ChatWithReportRequest(BaseModel):
     user_id: str
     message: str
 
-# =========================================================
-# HEALTH CHECK (Required for Render)
-# =========================================================
+# ============================================================
+# HEALTH CHECK (RENDER)
+# ============================================================
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
-# =========================================================
-# PREDICTION
-# =========================================================
+# ============================================================
+# PREDICTION ENDPOINT
+# ============================================================
 
 @app.post("/predict")
 def predict(data: PredictRequest):
@@ -105,20 +105,19 @@ def predict(data: PredictRequest):
     else:
         risk = "Low"
 
-    explanation = explain_prediction(features, model)
+    explanation = explain_prediction(features)
 
     # Save to Supabase
     supabase.table("user_assessments").insert({
-    "user_id": data.get("user_id", "anonymous"),
-    "sleep": data["sleep"],
-    "work_hours": data["work_hours"],
-    "study_hours": data["study_hours"],
-    "screen_time": data["screen_time"],
-    "stress": data["stress"],
-    "fatigue": data["fatigue"],
-    "prediction": float(probability)
+        "user_id": data.user_id,
+        "sleep": data.sleep,
+        "work_hours": data.work_hours,
+        "study_hours": data.study_hours,
+        "screen_time": data.screen_time,
+        "stress": data.stress,
+        "fatigue": data.fatigue,
+        "prediction": float(probability)
     }).execute()
-
 
     return {
         "burnout_probability": float(probability),
@@ -126,9 +125,9 @@ def predict(data: PredictRequest):
         "explanation": explanation
     }
 
-# =========================================================
+# ============================================================
 # SIMPLE CHATBOT
-# =========================================================
+# ============================================================
 
 @app.post("/chat")
 def chat(data: ChatRequest):
@@ -153,18 +152,21 @@ def chat(data: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# =========================================================
-# CHAT WITH REPORT (RAG)
-# =========================================================
+# ============================================================
+# CHAT WITH USER REPORTS (RAG)
+# ============================================================
 
 @app.post("/chat_with_report")
 def chat_with_report(data: ChatWithReportRequest):
 
     try:
-        records = supabase.table("user_predictions") \
-            .select("*") \
-            .eq("user_id", data.user_id) \
+        records = (
+            supabase
+            .table("user_assessments")
+            .select("*")
+            .eq("user_id", data.user_id)
             .execute()
+        )
 
         history = records.data
 
