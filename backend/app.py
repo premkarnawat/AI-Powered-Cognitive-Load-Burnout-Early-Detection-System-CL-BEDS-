@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import numpy as np
 import joblib
 import os
@@ -17,6 +18,12 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise Exception("Supabase credentials missing")
+
+if not OPENROUTER_API_KEY:
+    raise Exception("OpenRouter API key missing")
+
 # ----------------------------------
 # Clients
 # ----------------------------------
@@ -29,36 +36,64 @@ llm_client = OpenAI(
 )
 
 # ----------------------------------
-# Load ML Model
-# ---------------------------------
+# Load ML Model Safely
+# ----------------------------------
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(BASE_DIR, "..", "model", "burnout_model.pkl")
 
 model = joblib.load(model_path)
 
-
 # ----------------------------------
-# App Init
+# FastAPI App
 # ----------------------------------
 
 app = FastAPI(title="AI Powered Burnout Detection System")
 
+# ----------------------------------
+# Request Models (Prevents 422 Error)
+# ----------------------------------
+
+class PredictRequest(BaseModel):
+    user_id: str
+    fatigue: int
+    work_hours: int
+    sleep: int
+    screen_time: int
+    study_hours: int
+    social_media_hours: int
+    stress: int
+
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatWithReportRequest(BaseModel):
+    user_id: str
+    message: str
+
 # =========================================================
-# PREDICTION ENDPOINT
+# HEALTH CHECK (Required for Render)
+# =========================================================
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+# =========================================================
+# PREDICTION
 # =========================================================
 
 @app.post("/predict")
-def predict(data: dict):
+def predict(data: PredictRequest):
 
     features = [
-        data["fatigue"],
-        data["work_hours"],
-        data["sleep"],
-        data["screen_time"],
-        data["study_hours"],
-        data["social_media_hours"],
-        data["stress"]
+        data.fatigue,
+        data.work_hours,
+        data.sleep,
+        data.screen_time,
+        data.study_hours,
+        data.social_media_hours,
+        data.stress
     ]
 
     probability = model.predict_proba([features])[0][1]
@@ -70,18 +105,18 @@ def predict(data: dict):
     else:
         risk = "Low"
 
-    explanation = explain_prediction(features)
+    explanation = explain_prediction(features, model)
 
-    # Store into Supabase
+    # Save to Supabase
     supabase.table("user_predictions").insert({
-        "user_id": data.get("user_id", "anonymous"),
-        "fatigue": data["fatigue"],
-        "work_hours": data["work_hours"],
-        "sleep": data["sleep"],
-        "screen_time": data["screen_time"],
-        "study_hours": data["study_hours"],
-        "social_media_hours": data["social_media_hours"],
-        "stress": data["stress"],
+        "user_id": data.user_id,
+        "fatigue": data.fatigue,
+        "work_hours": data.work_hours,
+        "sleep": data.sleep,
+        "screen_time": data.screen_time,
+        "study_hours": data.study_hours,
+        "social_media_hours": data.social_media_hours,
+        "stress": data.stress,
         "burnout_probability": float(probability),
         "risk_level": risk
     }).execute()
@@ -97,7 +132,7 @@ def predict(data: dict):
 # =========================================================
 
 @app.post("/chat")
-def chat(data: dict):
+def chat(data: ChatRequest):
 
     try:
         response = llm_client.chat.completions.create(
@@ -109,7 +144,7 @@ def chat(data: dict):
                 },
                 {
                     "role": "user",
-                    "content": data["message"]
+                    "content": data.message
                 }
             ]
         )
@@ -117,22 +152,19 @@ def chat(data: dict):
         return {"reply": response.choices[0].message.content}
 
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
 
 # =========================================================
-# CHATBOT WITH USER HISTORY (RAG)
+# CHAT WITH REPORT (RAG)
 # =========================================================
 
 @app.post("/chat_with_report")
-def chat_with_report(data: dict):
+def chat_with_report(data: ChatWithReportRequest):
 
     try:
-        user_id = data["user_id"]
-        question = data["message"]
-
         records = supabase.table("user_predictions") \
             .select("*") \
-            .eq("user_id", user_id) \
+            .eq("user_id", data.user_id) \
             .execute()
 
         history = records.data
@@ -140,11 +172,11 @@ def chat_with_report(data: dict):
         prompt = f"""
 You are an AI mental wellness analyst.
 
-Here is user's burnout history:
+User burnout history:
 {history}
 
 User question:
-{question}
+{data.message}
 
 Analyze patterns and give clear advice.
 """
@@ -157,4 +189,4 @@ Analyze patterns and give clear advice.
         return {"reply": response.choices[0].message.content}
 
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
