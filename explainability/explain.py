@@ -1,13 +1,17 @@
-import joblib
 import numpy as np
-from lime.lime_tabular import LimeTabularExplainer
 import pandas as pd
+from lime.lime_tabular import LimeTabularExplainer
+import os
 
-# Load model
-model = joblib.load("model/burnout_model.pkl")
+# -----------------------------
+# Load Dataset Safely
+# -----------------------------
 
-# Load training data for LIME background
-data = pd.read_csv("datasets/final_clean_dataset.csv")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+data_path = os.path.join(BASE_DIR, "..", "datasets", "final_clean_dataset.csv")
+
+data = pd.read_csv(data_path)
+
 X = data.drop("label", axis=1)
 
 explainer = LimeTabularExplainer(
@@ -17,8 +21,7 @@ explainer = LimeTabularExplainer(
     mode="classification"
 )
 
-def explain_prediction(features):
-
+def explain_prediction(features, model):
     exp = explainer.explain_instance(
         np.array(features),
         model.predict_proba,
