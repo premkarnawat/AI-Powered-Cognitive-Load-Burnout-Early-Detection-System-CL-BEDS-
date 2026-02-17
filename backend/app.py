@@ -64,7 +64,9 @@ class PredictRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    user_id: str
     message: str
+
 
 
 class ChatWithReportRequest(BaseModel):
