@@ -137,18 +137,21 @@ def chat(data: ChatRequest):
         response = llm_client.chat.completions.create(
             model="mistralai/mistral-7b-instruct",
             messages=[
-                {
-                    "role": "system",
-                    "content": "You are a supportive mental health assistant."
-                },
-                {
-                    "role": "user",
-                    "content": data.message
-                }
+                {"role": "system", "content": "You are a supportive mental health assistant."},
+                {"role": "user", "content": data.message}
             ]
         )
 
-        return {"reply": response.choices[0].message.content}
+        reply = response.choices[0].message.content
+
+        # Save chat to database
+        supabase.table("chat_history").insert({
+            "user_id": data.user_id,
+            "user_message": data.message,
+            "bot_reply": reply
+        }).execute()
+
+        return {"reply": reply}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
