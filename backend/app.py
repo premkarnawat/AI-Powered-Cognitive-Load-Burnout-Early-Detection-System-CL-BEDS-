@@ -62,13 +62,16 @@ class PredictRequest(BaseModel):
     social_media_hours: int
     stress: int
 
+
 class ChatRequest(BaseModel):
     user_id: str
     message: str
 
+
 class ChatWithReportRequest(BaseModel):
     user_id: str
     message: str
+
 
 # =====================================================
 # HEALTH
@@ -77,6 +80,7 @@ class ChatWithReportRequest(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 # =====================================================
 # PREDICT
@@ -124,6 +128,7 @@ def predict(data: PredictRequest):
         "explanation": explanation
     }
 
+
 # =====================================================
 # CHAT
 # =====================================================
@@ -133,7 +138,7 @@ def chat(data: ChatRequest):
 
     try:
         response = llm_client.chat.completions.create(
-            model="mistralai/mistral-7b-instruct:free",
+            model="openchat/openchat-7b:free",
             messages=[
                 {"role": "system", "content": "You are a supportive mental health assistant."},
                 {"role": "user", "content": data.message}
@@ -153,8 +158,9 @@ def chat(data: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # =====================================================
-# CHAT WITH REPORT
+# CHAT WITH REPORT (RAG)
 # =====================================================
 
 @app.post("/chat_with_report")
@@ -181,7 +187,7 @@ Analyze patterns and give clear advice.
 """
 
         response = llm_client.chat.completions.create(
-            model="mistralai/mistral-7b-instruct:free",
+            model="openchat/openchat-7b:free",
             messages=[{"role": "user", "content": prompt}]
         )
 
