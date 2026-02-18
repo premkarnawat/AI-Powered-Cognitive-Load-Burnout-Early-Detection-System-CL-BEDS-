@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware   # ✅ ADD THIS
 from pydantic import BaseModel
 import joblib
 import os
@@ -47,6 +48,18 @@ model = joblib.load(model_path)
 # =====================================================
 
 app = FastAPI(title="AI Powered Burnout Detection System")
+
+# =====================================================
+# ✅ CORS FIX (ONLY ADDITION)
+# =====================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   # allow all frontend domains
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # =====================================================
 # SCHEMAS
@@ -125,7 +138,7 @@ def predict(data: PredictRequest):
     }
 
 # =====================================================
-# CHAT (FIXED)
+# CHAT
 # =====================================================
 
 @app.post("/chat")
@@ -133,7 +146,7 @@ def chat(data: ChatRequest):
 
     try:
         response = llm_client.chat.completions.create(
-            model="mistralai/mistral-7b-instruct",   # ✅ WORKING MODEL
+            model="mistralai/mistral-7b-instruct",
             messages=[
                 {"role": "system", "content": "You are a supportive mental health assistant."},
                 {"role": "user", "content": data.message}
@@ -155,7 +168,7 @@ def chat(data: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
-# CHAT WITH REPORT (RAG)
+# CHAT WITH REPORT
 # =====================================================
 
 @app.post("/chat_with_report")
@@ -182,7 +195,7 @@ Analyze patterns and give clear advice.
 """
 
         response = llm_client.chat.completions.create(
-            model="mistralai/mistral-7b-instruct",   # ✅ WORKING MODEL
+            model="mistralai/mistral-7b-instruct",
             messages=[{"role": "user", "content": prompt}],
             timeout=60
         )
