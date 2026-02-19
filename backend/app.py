@@ -160,36 +160,30 @@ def save_health_profile(data: HealthProfileRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
-# ✅ FIXED PREDICT
+# PREDICT  (✅ FIXED)
 # =====================================================
 
 @app.post("/predict")
 def predict(data: PredictRequest):
 
-    # ✅ Force numbers (prevents NaN)
-    fatigue = int(data.fatigue)
-    work_hours = int(data.work_hours)
-    sleep = int(data.sleep)
-    screen_time = int(data.screen_time)
-    study_hours = int(data.study_hours)
-    social_media_hours = int(data.social_media_hours)
+    # ✅ SCALE FATIGUE TO MATCH TRAINING DATA
+    fatigue = int(data.fatigue) * 10
     stress = int(data.stress)
 
-    fatigue = int(data.fatigue) * 10   # scale to 0–100
-    stress = int(data.stress)          # already correct
-
-features = [
-    fatigue,
-    data.work_hours,
-    data.sleep,
-    data.screen_time,
-    data.study_hours,
-    data.social_media_hours,
-    stress
-]
-
+    features = [
+        fatigue,
+        data.work_hours,
+        data.sleep,
+        data.screen_time,
+        data.study_hours,
+        data.social_media_hours,
+        stress
+    ]
 
     probability = float(model.predict_proba([features])[0][1])
+
+    # ✅ CLAMP PROBABILITY
+    probability = max(0.01, min(probability, 0.99))
 
     if probability > 0.7:
         risk = "High"
@@ -202,11 +196,11 @@ features = [
 
     supabase.table("user_assessments").insert({
         "user_id": data.user_id,
-        "sleep": sleep,
-        "work_hours": work_hours,
-        "study_hours": study_hours,
-        "screen_time": screen_time,
-        "social_media_hours": social_media_hours,
+        "sleep": data.sleep,
+        "work_hours": data.work_hours,
+        "study_hours": data.study_hours,
+        "screen_time": data.screen_time,
+        "social_media_hours": data.social_media_hours,
         "stress": stress,
         "fatigue": fatigue,
         "burnout_probability": probability,
