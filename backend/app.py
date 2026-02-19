@@ -160,23 +160,32 @@ def save_health_profile(data: HealthProfileRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
-# PREDICT
+# ✅ FIXED PREDICT
 # =====================================================
 
 @app.post("/predict")
 def predict(data: PredictRequest):
 
+    # ✅ Force numbers (prevents NaN)
+    fatigue = int(data.fatigue)
+    work_hours = int(data.work_hours)
+    sleep = int(data.sleep)
+    screen_time = int(data.screen_time)
+    study_hours = int(data.study_hours)
+    social_media_hours = int(data.social_media_hours)
+    stress = int(data.stress)
+
     features = [
-        data.fatigue,
-        data.work_hours,
-        data.sleep,
-        data.screen_time,
-        data.study_hours,
-        data.social_media_hours,
-        data.stress
+        fatigue,
+        work_hours,
+        sleep,
+        screen_time,
+        study_hours,
+        social_media_hours,
+        stress
     ]
 
-    probability = model.predict_proba([features])[0][1]
+    probability = float(model.predict_proba([features])[0][1])
 
     if probability > 0.7:
         risk = "High"
@@ -189,19 +198,19 @@ def predict(data: PredictRequest):
 
     supabase.table("user_assessments").insert({
         "user_id": data.user_id,
-        "sleep": data.sleep,
-        "work_hours": data.work_hours,
-        "study_hours": data.study_hours,
-        "screen_time": data.screen_time,
-        "social_media_hours": data.social_media_hours,
-        "stress": data.stress,
-        "fatigue": data.fatigue,
-        "burnout_probability": float(probability),
+        "sleep": sleep,
+        "work_hours": work_hours,
+        "study_hours": study_hours,
+        "screen_time": screen_time,
+        "social_media_hours": social_media_hours,
+        "stress": stress,
+        "fatigue": fatigue,
+        "burnout_probability": probability,
         "risk_level": risk
     }).execute()
 
     return {
-        "burnout_probability": float(probability),
+        "burnout_probability": probability,
         "risk_level": risk,
         "explanation": explanation
     }
