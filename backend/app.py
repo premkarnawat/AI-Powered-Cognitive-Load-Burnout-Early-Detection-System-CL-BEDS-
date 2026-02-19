@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware   # ✅ ADD THIS
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import os
@@ -50,7 +50,7 @@ model = joblib.load(model_path)
 app = FastAPI(title="AI Powered Burnout Detection System")
 
 # =====================================================
-# ✅ CORS FIX
+# CORS
 # =====================================================
 
 app.add_middleware(
@@ -83,6 +83,27 @@ class ChatWithReportRequest(BaseModel):
     user_id: str
     message: str
 
+class ProfileRequest(BaseModel):
+    user_id: str
+    full_name: str | None = None
+    phone: str | None = None
+    role: str | None = None
+    age: int | None = None
+    gender: str | None = None
+    address: str | None = None
+    city: str | None = None
+    country: str | None = None
+
+class HealthProfileRequest(BaseModel):
+    user_id: str
+    height: float | None = None
+    weight: float | None = None
+    blood_group: str | None = None
+    bp: str | None = None
+    pulse: int | None = None
+    hb: float | None = None
+    health_conditions: str | None = None
+
 # =====================================================
 # HEALTH
 # =====================================================
@@ -90,6 +111,53 @@ class ChatWithReportRequest(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+# =====================================================
+# SAVE PROFILE
+# =====================================================
+
+@app.post("/save_profile")
+def save_profile(data: ProfileRequest):
+    try:
+        supabase.table("profiles").upsert({
+            "id": data.user_id,
+            "full_name": data.full_name,
+            "phone": data.phone,
+            "role": data.role,
+            "age": data.age,
+            "gender": data.gender,
+            "address": data.address,
+            "city": data.city,
+            "country": data.country
+        }).execute()
+
+        return {"message": "Profile saved"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# =====================================================
+# SAVE HEALTH PROFILE
+# =====================================================
+
+@app.post("/save_health_profile")
+def save_health_profile(data: HealthProfileRequest):
+    try:
+        supabase.table("health_profiles").upsert({
+            "user_id": data.user_id,
+            "height": data.height,
+            "weight": data.weight,
+            "blood_group": data.blood_group,
+            "bp": data.bp,
+            "pulse": data.pulse,
+            "hb": data.hb,
+            "health_conditions": data.health_conditions
+        }).execute()
+
+        return {"message": "Health profile saved"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # =====================================================
 # PREDICT
@@ -119,7 +187,6 @@ def predict(data: PredictRequest):
 
     explanation = explain_prediction(features, model)
 
-    # ✅ ADDED risk_level FIELD
     supabase.table("user_assessments").insert({
         "user_id": data.user_id,
         "sleep": data.sleep,
@@ -202,7 +269,7 @@ Analyze patterns and give clear advice.
             timeout=60
         )
 
-        return {"reply": response.choices[0].message.content or "No data found yet."}
+        return {"reply": response.choices[0].message.content or "No data yet."}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
