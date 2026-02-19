@@ -175,15 +175,19 @@ def predict(data: PredictRequest):
     social_media_hours = int(data.social_media_hours)
     stress = int(data.stress)
 
-    features = [
-        fatigue,
-        work_hours,
-        sleep,
-        screen_time,
-        study_hours,
-        social_media_hours,
-        stress
-    ]
+    fatigue = int(data.fatigue) * 10   # scale to 0–100
+    stress = int(data.stress)          # already correct
+
+features = [
+    fatigue,
+    data.work_hours,
+    data.sleep,
+    data.screen_time,
+    data.study_hours,
+    data.social_media_hours,
+    stress
+]
+
 
     probability = float(model.predict_proba([features])[0][1])
 
