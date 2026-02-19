@@ -50,12 +50,12 @@ model = joblib.load(model_path)
 app = FastAPI(title="AI Powered Burnout Detection System")
 
 # =====================================================
-# ✅ CORS FIX (ONLY ADDITION)
+# ✅ CORS FIX
 # =====================================================
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # allow all frontend domains
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -119,6 +119,7 @@ def predict(data: PredictRequest):
 
     explanation = explain_prediction(features, model)
 
+    # ✅ ADDED risk_level FIELD
     supabase.table("user_assessments").insert({
         "user_id": data.user_id,
         "sleep": data.sleep,
@@ -128,7 +129,8 @@ def predict(data: PredictRequest):
         "social_media_hours": data.social_media_hours,
         "stress": data.stress,
         "fatigue": data.fatigue,
-        "burnout_probability": float(probability)
+        "burnout_probability": float(probability),
+        "risk_level": risk
     }).execute()
 
     return {
@@ -154,7 +156,7 @@ def chat(data: ChatRequest):
             timeout=60
         )
 
-        reply = response.choices[0].message.content
+        reply = response.choices[0].message.content or "I'm here to help you."
 
         supabase.table("chat_history").insert({
             "user_id": data.user_id,
@@ -200,7 +202,7 @@ Analyze patterns and give clear advice.
             timeout=60
         )
 
-        return {"reply": response.choices[0].message.content}
+        return {"reply": response.choices[0].message.content or "No data found yet."}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
